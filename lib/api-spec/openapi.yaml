@@ -1,0 +1,1119 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: MedEat API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: medicines
+    description: Medicine cabinet and tracking
+  - name: dose-logs
+    description: Dose logging and adherence
+  - name: food-logs
+    description: Daily food and nutrition logging
+  - name: grocery
+    description: Grocery list management
+  - name: profile
+    description: User nutrition and allergy profile
+  - name: recipes
+    description: AI recipe suggestions
+  - name: summary
+    description: Dashboard summaries
+  - name: diet-chart
+    description: Nutritionist PDF diet chart and Indian meal suggestions
+paths:
+  /diet-chart:
+    get:
+      operationId: getDietChart
+      tags: [diet-chart]
+      summary: Get the latest uploaded diet chart
+      responses:
+        "200":
+          description: Diet chart or null if none uploaded
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/DietChart"
+                  - type: "null"
+
+  /diet-chart/upload:
+    post:
+      operationId: uploadDietChart
+      tags: [diet-chart]
+      summary: Upload and parse a nutritionist PDF diet chart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadDietChartBody"
+      responses:
+        "200":
+          description: Parsed diet chart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DietChart"
+        "400":
+          description: Invalid request
+        "422":
+          description: Could not extract macros from PDF
+
+  /diet-chart/suggestions:
+    get:
+      operationId: getDietChartSuggestions
+      tags: [diet-chart]
+      summary: Get homemade Indian meal suggestions based on remaining macro budget
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: List of meal suggestions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MealSuggestion"
+
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /medicines:
+    get:
+      operationId: listMedicines
+      tags: [medicines]
+      summary: List all medicines
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, paused, finished, all]
+      responses:
+        "200":
+          description: List of medicines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Medicine"
+    post:
+      operationId: createMedicine
+      tags: [medicines]
+      summary: Add a new medicine
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMedicineBody"
+      responses:
+        "201":
+          description: Created medicine
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Medicine"
+
+  /medicines/{id}:
+    get:
+      operationId: getMedicine
+      tags: [medicines]
+      summary: Get a medicine by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Medicine details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Medicine"
+    patch:
+      operationId: updateMedicine
+      tags: [medicines]
+      summary: Update a medicine
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMedicineBody"
+      responses:
+        "200":
+          description: Updated medicine
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Medicine"
+    delete:
+      operationId: deleteMedicine
+      tags: [medicines]
+      summary: Delete a medicine
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /medicines/{id}/take:
+    post:
+      operationId: takeDose
+      tags: [medicines]
+      summary: Mark a dose as taken and decrement pill count
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TakeDoseBody"
+      responses:
+        "200":
+          description: Updated medicine with dose log
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TakeDoseResponse"
+
+  /medicines/{id}/refill:
+    post:
+      operationId: refillMedicine
+      tags: [medicines]
+      summary: Log a refill and update pill count
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefillMedicineBody"
+      responses:
+        "200":
+          description: Updated medicine
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Medicine"
+
+  /dose-logs:
+    get:
+      operationId: listDoseLogs
+      tags: [dose-logs]
+      summary: List dose logs
+      parameters:
+        - name: medicineId
+          in: query
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: List of dose logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DoseLog"
+
+  /food-logs:
+    get:
+      operationId: listFoodLogs
+      tags: [food-logs]
+      summary: Get food logs for a date
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Food logs for the date
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FoodLog"
+    post:
+      operationId: createFoodLog
+      tags: [food-logs]
+      summary: Add a food log entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFoodLogBody"
+      responses:
+        "201":
+          description: Created food log entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FoodLog"
+
+  /food-logs/{id}:
+    delete:
+      operationId: deleteFoodLog
+      tags: [food-logs]
+      summary: Delete a food log entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /grocery:
+    get:
+      operationId: listGroceryItems
+      tags: [grocery]
+      summary: Get the grocery list
+      responses:
+        "200":
+          description: Grocery items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GroceryItem"
+    post:
+      operationId: createGroceryItem
+      tags: [grocery]
+      summary: Add an item to the grocery list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroceryItemBody"
+      responses:
+        "201":
+          description: Created grocery item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroceryItem"
+
+  /grocery/{id}:
+    patch:
+      operationId: updateGroceryItem
+      tags: [grocery]
+      summary: Update a grocery item (e.g. check/uncheck)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGroceryItemBody"
+      responses:
+        "200":
+          description: Updated grocery item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroceryItem"
+    delete:
+      operationId: deleteGroceryItem
+      tags: [grocery]
+      summary: Delete a grocery item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /grocery/clear-checked:
+    delete:
+      operationId: clearCheckedGroceryItems
+      tags: [grocery]
+      summary: Clear all checked items from grocery list
+      responses:
+        "204":
+          description: Cleared
+
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: Get user nutrition and allergy profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+    put:
+      operationId: updateProfile
+      tags: [profile]
+      summary: Update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /recipes/suggestions:
+    get:
+      operationId: getRecipeSuggestions
+      tags: [recipes]
+      summary: Get AI-generated recipe suggestions based on profile and remaining macros
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Recipe suggestions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Recipe"
+
+  /summary/dashboard:
+    get:
+      operationId: getDashboardSummary
+      tags: [summary]
+      summary: Get today's dashboard summary (medicines due, macros, grocery count)
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /summary/adherence:
+    get:
+      operationId: getAdherenceSummary
+      tags: [summary]
+      summary: Get 7-day adherence streak and stats per medicine; pass month for monthly heatmap
+      parameters:
+        - name: month
+          in: query
+          required: false
+          schema:
+            type: string
+            description: "Month in YYYY-MM format to return monthly heatmap data"
+      responses:
+        "200":
+          description: Adherence stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdherenceSummary"
+
+  /summary/macros:
+    get:
+      operationId: getMacrosSummary
+      tags: [summary]
+      summary: Get today's macro totals vs goals and remaining budget
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Macros summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MacrosSummary"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    Medicine:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        dose:
+          type: string
+        form:
+          type: string
+          enum: [tablet, capsule, syrup, injection, drops, patch, other]
+        frequency:
+          type: string
+          enum: [daily, twice_daily, three_times_daily, every_n_hours, specific_days, as_needed]
+        timesOfDay:
+          type: array
+          items:
+            type: string
+        pillCount:
+          type: integer
+        refillThreshold:
+          type: integer
+        status:
+          type: string
+          enum: [active, paused, finished]
+        foodInstruction:
+          type: string
+          enum: [before_food, after_food, with_water, any]
+        prescriptionExpiry:
+          type: string
+          format: date
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, dose, form, frequency, timesOfDay, pillCount, refillThreshold, status, foodInstruction, createdAt]
+
+    CreateMedicineBody:
+      type: object
+      properties:
+        name:
+          type: string
+        dose:
+          type: string
+        form:
+          type: string
+          enum: [tablet, capsule, syrup, injection, drops, patch, other]
+        frequency:
+          type: string
+          enum: [daily, twice_daily, three_times_daily, every_n_hours, specific_days, as_needed]
+        timesOfDay:
+          type: array
+          items:
+            type: string
+        pillCount:
+          type: integer
+        refillThreshold:
+          type: integer
+        foodInstruction:
+          type: string
+          enum: [before_food, after_food, with_water, any]
+        prescriptionExpiry:
+          type: string
+          format: date
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+      required: [name, dose, form, frequency, timesOfDay, pillCount, refillThreshold, foodInstruction]
+
+    UpdateMedicineBody:
+      type: object
+      properties:
+        name:
+          type: string
+        dose:
+          type: string
+        form:
+          type: string
+          enum: [tablet, capsule, syrup, injection, drops, patch, other]
+        frequency:
+          type: string
+          enum: [daily, twice_daily, three_times_daily, every_n_hours, specific_days, as_needed]
+        timesOfDay:
+          type: array
+          items:
+            type: string
+        pillCount:
+          type: integer
+        refillThreshold:
+          type: integer
+        status:
+          type: string
+          enum: [active, paused, finished]
+        foodInstruction:
+          type: string
+          enum: [before_food, after_food, with_water, any]
+        prescriptionExpiry:
+          type: string
+          format: date
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+
+    TakeDoseBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [taken, skipped, missed]
+        scheduledTime:
+          type: string
+      required: [status]
+
+    TakeDoseResponse:
+      type: object
+      properties:
+        medicine:
+          $ref: "#/components/schemas/Medicine"
+        doseLog:
+          $ref: "#/components/schemas/DoseLog"
+        refillAlert:
+          type: boolean
+      required: [medicine, doseLog, refillAlert]
+
+    RefillMedicineBody:
+      type: object
+      properties:
+        newCount:
+          type: integer
+      required: [newCount]
+
+    DoseLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        medicineId:
+          type: integer
+        medicineName:
+          type: string
+        status:
+          type: string
+          enum: [taken, skipped, missed]
+        scheduledTime:
+          type: string
+          nullable: true
+        takenAt:
+          type: string
+          format: date-time
+      required: [id, medicineId, medicineName, status, takenAt]
+
+    FoodLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          format: date
+        foodName:
+          type: string
+        calories:
+          type: number
+        proteinG:
+          type: number
+        carbsG:
+          type: number
+        fatG:
+          type: number
+        mealType:
+          type: string
+          enum: [breakfast, lunch, dinner, snack]
+        servingSize:
+          type: string
+          nullable: true
+        loggedAt:
+          type: string
+          format: date-time
+      required: [id, date, foodName, calories, proteinG, carbsG, fatG, mealType, loggedAt]
+
+    CreateFoodLogBody:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        foodName:
+          type: string
+        calories:
+          type: number
+        proteinG:
+          type: number
+        carbsG:
+          type: number
+        fatG:
+          type: number
+        mealType:
+          type: string
+          enum: [breakfast, lunch, dinner, snack]
+        servingSize:
+          type: string
+          nullable: true
+      required: [date, foodName, calories, proteinG, carbsG, fatG, mealType]
+
+    GroceryItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        quantity:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        checked:
+          type: boolean
+        addedAt:
+          type: string
+          format: date-time
+      required: [id, name, checked, addedAt]
+
+    CreateGroceryItemBody:
+      type: object
+      properties:
+        name:
+          type: string
+        quantity:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+      required: [name]
+
+    UpdateGroceryItemBody:
+      type: object
+      properties:
+        name:
+          type: string
+        quantity:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        checked:
+          type: boolean
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        calorieGoal:
+          type: integer
+        proteinGoalG:
+          type: integer
+        carbsGoalG:
+          type: integer
+        fatGoalG:
+          type: integer
+        allergens:
+          type: array
+          items:
+            type: string
+        weightKg:
+          type: number
+          nullable: true
+        heightCm:
+          type: number
+          nullable: true
+        ageYears:
+          type: integer
+          nullable: true
+        activityLevel:
+          type: string
+          enum: [sedentary, light, moderate, active, very_active]
+          nullable: true
+        healthGoal:
+          type: string
+          enum: [lose_weight, maintain, gain_weight]
+          nullable: true
+        cuisinePreferences:
+          type: array
+          items:
+            type: string
+      required: [id, calorieGoal, proteinGoalG, carbsGoalG, fatGoalG, allergens, cuisinePreferences]
+
+    UpdateProfileBody:
+      type: object
+      properties:
+        calorieGoal:
+          type: integer
+        proteinGoalG:
+          type: integer
+        carbsGoalG:
+          type: integer
+        fatGoalG:
+          type: integer
+        allergens:
+          type: array
+          items:
+            type: string
+        weightKg:
+          type: number
+          nullable: true
+        heightCm:
+          type: number
+          nullable: true
+        ageYears:
+          type: integer
+          nullable: true
+        activityLevel:
+          type: string
+          enum: [sedentary, light, moderate, active, very_active]
+          nullable: true
+        healthGoal:
+          type: string
+          enum: [lose_weight, maintain, gain_weight]
+          nullable: true
+        cuisinePreferences:
+          type: array
+          items:
+            type: string
+
+    Recipe:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        ingredients:
+          type: array
+          items:
+            type: string
+        steps:
+          type: array
+          items:
+            type: string
+        calories:
+          type: number
+        proteinG:
+          type: number
+        carbsG:
+          type: number
+        fatG:
+          type: number
+        allergenFlags:
+          type: array
+          items:
+            type: string
+        cookTimeMinutes:
+          type: integer
+        servings:
+          type: integer
+      required: [title, description, ingredients, steps, calories, proteinG, carbsG, fatG, allergenFlags, cookTimeMinutes, servings]
+
+    DashboardSummary:
+      type: object
+      properties:
+        todayDosesDue:
+          type: integer
+        todayDosesTaken:
+          type: integer
+        medicinesNeedingRefill:
+          type: integer
+        activeMedicines:
+          type: integer
+        caloriesConsumed:
+          type: number
+        caloriesGoal:
+          type: number
+        groceryItemsCount:
+          type: integer
+        upcomingDoses:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpcomingDose"
+        expiringSoon:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExpiringSoonItem"
+      required: [todayDosesDue, todayDosesTaken, medicinesNeedingRefill, activeMedicines, caloriesConsumed, caloriesGoal, groceryItemsCount, upcomingDoses, expiringSoon]
+
+    ExpiringSoonItem:
+      type: object
+      properties:
+        medicineId:
+          type: integer
+        medicineName:
+          type: string
+        expiryDate:
+          type: string
+          format: date
+        daysRemaining:
+          type: integer
+      required: [medicineId, medicineName, expiryDate, daysRemaining]
+
+    UpcomingDose:
+      type: object
+      properties:
+        medicineId:
+          type: integer
+        medicineName:
+          type: string
+        dose:
+          type: string
+        scheduledTime:
+          type: string
+        pillCount:
+          type: integer
+        foodInstruction:
+          type: string
+      required: [medicineId, medicineName, dose, scheduledTime, pillCount, foodInstruction]
+
+    AdherenceSummary:
+      type: object
+      properties:
+        overallStreakDays:
+          type: integer
+        totalDosesTaken:
+          type: integer
+        totalDosesMissed:
+          type: integer
+        adherencePercent:
+          type: number
+        perMedicine:
+          type: array
+          items:
+            $ref: "#/components/schemas/MedicineAdherence"
+        monthlyAdherencePercent:
+          type: ["integer", "null"]
+        monthlyStreakDays:
+          type: ["integer", "null"]
+        monthlyDays:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/MonthlyAdherenceDay"
+      required: [overallStreakDays, totalDosesTaken, totalDosesMissed, adherencePercent, perMedicine, monthlyAdherencePercent, monthlyStreakDays, monthlyDays]
+
+    MonthlyAdherenceMedicineStat:
+      type: object
+      properties:
+        medicineId:
+          type: integer
+        medicineName:
+          type: string
+        status:
+          type: string
+          enum: [taken, missed, skipped, no_dose]
+      required: [medicineId, medicineName, status]
+
+    MonthlyAdherenceDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        taken:
+          type: integer
+        missed:
+          type: integer
+        skipped:
+          type: integer
+        medicines:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyAdherenceMedicineStat"
+      required: [date, taken, missed, skipped, medicines]
+
+    MedicineAdherence:
+      type: object
+      properties:
+        medicineId:
+          type: integer
+        medicineName:
+          type: string
+        taken:
+          type: integer
+        missed:
+          type: integer
+        skipped:
+          type: integer
+        streakDays:
+          type: integer
+        last7Days:
+          type: array
+          items:
+            type: string
+            enum: [taken, missed, skipped, no_dose]
+      required: [medicineId, medicineName, taken, missed, skipped, streakDays, last7Days]
+
+    MacrosSummary:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        caloriesConsumed:
+          type: number
+        caloriesGoal:
+          type: number
+        caloriesRemaining:
+          type: number
+        proteinConsumedG:
+          type: number
+        proteinGoalG:
+          type: number
+        carbsConsumedG:
+          type: number
+        carbsGoalG:
+          type: number
+        fatConsumedG:
+          type: number
+        fatGoalG:
+          type: number
+        mealBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/MealMacros"
+      required: [date, caloriesConsumed, caloriesGoal, caloriesRemaining, proteinConsumedG, proteinGoalG, carbsConsumedG, carbsGoalG, fatConsumedG, fatGoalG, mealBreakdown]
+
+    MealMacros:
+      type: object
+      properties:
+        mealType:
+          type: string
+          enum: [breakfast, lunch, dinner, snack]
+        calories:
+          type: number
+        items:
+          type: integer
+      required: [mealType, calories, items]
+
+    DietChart:
+      type: object
+      properties:
+        id:
+          type: integer
+        uploadedAt:
+          type: string
+          format: date-time
+        caloriesKcal:
+          type: number
+        proteinG:
+          type: number
+        carbsG:
+          type: number
+        fatG:
+          type: number
+        notes:
+          type: ["string", "null"]
+      required: [id, uploadedAt, caloriesKcal, proteinG, carbsG, fatG]
+
+    UploadDietChartBody:
+      type: object
+      properties:
+        pdfDataUrl:
+          type: string
+          description: Base64-encoded PDF as a data URL (data:application/pdf;base64,...)
+      required: [pdfDataUrl]
+
+    MealSuggestion:
+      type: object
+      properties:
+        mealType:
+          type: string
+          enum: [breakfast, lunch, dinner, snack]
+        name:
+          type: string
+        description:
+          type: string
+        calories:
+          type: number
+        proteinG:
+          type: number
+        carbsG:
+          type: number
+        fatG:
+          type: number
+      required: [mealType, name, description, calories, proteinG, carbsG, fatG]

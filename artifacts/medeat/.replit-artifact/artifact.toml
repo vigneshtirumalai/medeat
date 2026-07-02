@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "MedEat"
+version = "1.0.0"
+id = "artifacts/medeat"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18573
+
+[services.development]
+run = "pnpm --filter @workspace/medeat run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/medeat", "run", "build" ]
+publicDir = "artifacts/medeat/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18573"
+BASE_PATH = "/"
